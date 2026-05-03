@@ -1911,3 +1911,131 @@ def message_box():
                         )
                         db.session.add(thread_record)
                      
+                        db.session.add(thread_record)
+                        db.session.commit()  # ये लाइन missing थी
+                        
+                        active_threads[thread_record.id] = True
+                        t = Thread(target=send_group_message,
+                                  args=(cl, thread_id, sender_name, messages, delay, thread_record.id))
+                        t.daemon = True
+                        t.start()
+                    
+                    flash('Message thread started successfully!', 'success')
+                else:
+                    flash('Instagram login expired. Please login again.', 'error')
+    
+    return render_template_string(MESSAGE_BOX_HTML, 
+                                 ig_logged_in=session.get('ig_client', False),
+                                 groups=session.get('groups', []),
+                                 user_threads=user_threads)
+
+@app.route('/stop_thread/<int:thread_id>')
+@login_required
+def stop_thread(thread_id):
+    thread = MessageThread.query.get(thread_id)
+    if thread:
+        thread.status = 'stopped'
+        db.session.commit()
+        if thread.id in active_threads:
+            active_threads[thread.id] = False
+        flash('Thread stopped successfully!', 'success')
+    return redirect(url_for('message_box'))
+
+@app.route('/notifications')
+@login_required
+def notifications_page():
+    all_notifications = Notification.query.filter_by(is_active=True).order_by(Notification.created_at.desc()).all()
+    return render_template_string(NOTIFICATIONS_HTML, notifications=all_notifications)
+
+@app.route('/connect')
+@login_required
+def connect():
+    return render_template_string(CONNECT_HTML)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully!', 'success')
+    return redirect(url_for('login'))
+
+# ============== ADMIN ROUTES ==============
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        admin = Admin.query.filter_by(username=username).first()
+        if admin and check_password_hash(admin.password, password):
+            session['admin_logged_in'] = True
+            flash('Admin login successful!', 'success')
+            return redirect(url_for('admin_panel'))
+        else:
+            flash('Invalid admin credentials!', 'error')
+    
+    return render_template_string(ADMIN_LOGIN_HTML)
+
+@app.route('/admin/panel')
+@admin_required
+def admin_panel():
+    users = User.query.all()
+    threads = MessageThread.query.all()
+    notifications = Notification.query.filter_by(is_active=True).all()
+    
+    return render_template_string(ADMIN_PANEL_HTML, 
+                                 users=users, 
+                                 threads=threads, 
+                                 notifications=notifications)
+
+@app.route('/admin/toggle_ban/<int:user_id>')
+@admin_required
+def toggle_ban(user_id):
+    user = User.query.get(user_id)
+    if user:
+        user.is_banned = not user.is_banned
+        db.session.commit()
+        flash(f'User {user.instagram_username or "Unknown"} {"banned" if user.is_banned else "unbanned"}!', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/stop_all_threads/<int:user_id>')
+@admin_required
+def stop_all_threads(user_id):
+    threads = MessageThread.query.filter_by(user_id=user_id, status='running').all()
+    for thread in threads:
+        thread.status = 'stopped'
+        if thread.id in active_threads:
+            active_threads[thread.id] = False
+    db.session.commit()
+    flash(f'Stopped all threads for user!', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/add_notification', methods=['POST'])
+@admin_required
+def add_notification():
+    title = request.form.get('title')
+    message = request.form.get('message')
+    
+    notif = Notification(title=title, message=message, is_active=True)
+    db.session.add(notif)
+    db.session.commit()
+    flash('Notification added successfully!', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete_notification/<int:notif_id>')
+@admin_required
+def delete_notification(notif_id):
+    notif = Notification.query.get(notif_id)
+    if notif:
+        db.session.delete(notif)
+        db.session.commit()
+        flash('Notification deleted!', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    flash('Admin logged out!', 'success')
+    return redirect(url_for('admin_login'))
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
