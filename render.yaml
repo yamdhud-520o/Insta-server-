@@ -1,20 +1,23 @@
 services:
   - type: web
-    name: raj-singh-messenger
+    name: raj-thakur-messenger
     runtime: python
-    repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME  # Change this to your repo URL
+    repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME  # Change this
     plan: free
-    region: oregon
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    region: singapore
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      python app.py
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: raj-singh-db
+          name: raj-thakur-db
           property: connectionString
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.10.12
 
 databases:
-  - name: raj-singh-db
+  - name: raj-thakur-db
     plan: free
+    region: singapore
