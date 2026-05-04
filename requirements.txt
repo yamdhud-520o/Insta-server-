@@ -1,6 +1,6 @@
-Flask==2.3.3
-Flask-SQLAlchemy==3.0.5
-instagrapi==2.0.0
-Werkzeug==2.3.7
-SQLAlchemy==2.0.21
-psycopg2-binary==2.9.9
+flask
+flask-sqlalchemy
+instagrapi
+werkzeug
+gunicorn
+psycopg2-binary
